@@ -1,0 +1,10 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: sneakstock
+      MYSQL_USER: sneakstock
+      MYSQL_PASSWORD: sneakstock
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"

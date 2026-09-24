@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: sneakstock
+  datasource:
+    url: jdbc:mysql://localhost:3307/sneakstock
+    username: sneakstock
+    password: sneakstock
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
