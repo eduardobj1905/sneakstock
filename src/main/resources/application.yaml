@@ -2,9 +2,9 @@ spring:
   application:
     name: sneakstock
   datasource:
-    url: jdbc:mysql://localhost:3307/sneakstock
-    username: sneakstock
-    password: sneakstock
+    url: ${DB_URL:jdbc:mysql://localhost:3307/sneakstock}
+    username: ${DB_USERNAME:sneakstock}
+    password: ${DB_PASSWORD:sneakstock}
   jpa:
     hibernate:
       ddl-auto: validate

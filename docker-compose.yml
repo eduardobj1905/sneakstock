@@ -3,8 +3,18 @@ services:
     image: mysql:8.4
     environment:
       MYSQL_DATABASE: sneakstock
-      MYSQL_USER: sneakstock
-      MYSQL_PASSWORD: sneakstock
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: ${DB_USERNAME:-sneakstock}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-sneakstock}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
     ports:
       - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql-data:
