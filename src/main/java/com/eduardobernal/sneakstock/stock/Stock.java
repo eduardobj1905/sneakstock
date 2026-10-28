@@ -64,4 +64,11 @@ public class Stock {
         }
         quantity -= units;
     }
+
+    public void add(int units) {
+        if (units <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor que 0");
+        }
+        quantity += units;
+    }
 }

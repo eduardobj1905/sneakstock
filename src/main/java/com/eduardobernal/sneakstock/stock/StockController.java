@@ -29,4 +29,10 @@ public class StockController {
     public void sell(@RequestBody SaleRequest request) {
         stockService.sell(request.barcode(), request.storeNumber(), request.units());
     }
+
+    @PostMapping("/entries")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void receive(@RequestBody EntryRequest request) {
+        stockService.receive(request.barcode(), request.storeNumber(), request.units());
+    }
 }
