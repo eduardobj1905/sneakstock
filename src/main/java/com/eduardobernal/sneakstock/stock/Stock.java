@@ -53,4 +53,15 @@ public class Stock {
         this.store = store;
         this.quantity = 0;
     }
+
+    public void remove(int units) {
+        if (units <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor que 0");
+        }
+        if (units > quantity) {
+            throw new IllegalStateException(
+                    "Stock insuficiente: hay " + quantity + " pares y se piden " + units);
+        }
+        quantity -= units;
+    }
 }
