@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -19,9 +20,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.eduardobernal.sneakstock.catalog.ProductVariantRepository;
+import com.eduardobernal.sneakstock.store.StoreRepository;
 
 @ExtendWith(MockitoExtension.class)
 class StockServiceTest {
+
+    @Mock
+    private ProductVariantRepository productVariantRepository;
+
+    @Mock
+    private StoreRepository storeRepository;
 
     @Mock
     private StockRepository stockRepository;
@@ -97,5 +106,56 @@ class StockServiceTest {
         // Assert: el stock no cambia y no se guarda ningún movimiento
         assertThat(stock.getQuantity()).isEqualTo(6);
         verify(stockMovementRepository, never()).save(any());
+    }
+    @Test
+    @DisplayName("Entrada de una talla que la tienda ya tenía: suma los pares sin crear fila nueva")
+    void receiveExistingStock() {
+        // Arrange: Gran Vía tiene 2 pares del Dunk US 10
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us10 = new ProductVariant(dunk, "10", "44", "8400000000028");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        Stock stock = new Stock(us10, granVia);
+        stock.add(2);
+
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000028", "0001"))
+                .thenReturn(Optional.of(stock));
+
+        // Act: llegan 4 pares
+        stockService.receive("8400000000028", "0001", 4);
+
+        // Assert: hay 6, se apunta el movimiento y NO se crea ninguna fila de stock
+        assertThat(stock.getQuantity()).isEqualTo(6);
+        verify(stockMovementRepository).save(any(StockMovement.class));
+        verify(stockRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Entrada de una talla que la tienda nunca ha tenido: crea la fila con los pares recibidos")
+    void receiveNewSize() {
+        // Arrange: Gran Vía nunca ha tenido el Samba US 9
+        Product samba = new Product("IE3437", "Adidas", "Samba OG", "White/Black", new BigDecimal("120.00"));
+        ProductVariant us9 = new ProductVariant(samba, "9", "42 2/3", "8400000000035");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000035", "0001"))
+                .thenReturn(Optional.empty());
+        when(productVariantRepository.findByBarcode("8400000000035"))
+                .thenReturn(Optional.of(us9));
+        when(storeRepository.findByStoreNumber("0001"))
+                .thenReturn(Optional.of(granVia));
+        when(stockRepository.save(any(Stock.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act: llegan 4 pares
+        stockService.receive("8400000000035", "0001", 4);
+
+        // Assert: se ha creado una fila de stock en Gran Vía con 4 pares, y se apunta el movimiento
+        ArgumentCaptor<Stock> captor = ArgumentCaptor.forClass(Stock.class);
+        verify(stockRepository).save(captor.capture());
+        Stock created = captor.getValue();
+
+        assertThat(created.getStore()).isSameAs(granVia);
+        assertThat(created.getQuantity()).isEqualTo(4);
+        verify(stockMovementRepository).save(any(StockMovement.class));
     }
 }
