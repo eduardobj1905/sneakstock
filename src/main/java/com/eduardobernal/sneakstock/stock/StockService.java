@@ -52,6 +52,31 @@ public class StockService {
 
         stockMovementRepository.save(new StockMovement(stock, MovementType.ENTRY, units, null));
     }
+    @Transactional
+    public void sendTransfer(String barcode, String originStoreNumber, String destinationStoreNumber, int units) {
+        if (originStoreNumber.equals(destinationStoreNumber)) {
+            throw new IllegalArgumentException("La tienda de origen y la de destino no pueden ser la misma");
+        }
+
+        Stock origin = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, originStoreNumber)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "La tienda " + originStoreNumber + " no tiene la talla " + barcode));
+
+        if (!origin.getStore().isActive()) {
+            throw new IllegalStateException("La tienda " + originStoreNumber + " está cerrada");
+        }
+
+        Store destination = storeRepository.findByStoreNumber(destinationStoreNumber)
+                .orElseThrow(() -> new IllegalArgumentException("No existe la tienda " + destinationStoreNumber));
+
+        if (!destination.isActive()) {
+            throw new IllegalStateException("La tienda destino " + destinationStoreNumber + " está cerrada");
+        }
+
+        origin.remove(units);
+
+        stockMovementRepository.save(StockMovement.transferOut(origin, units, destination));
+    }
 
     private Stock createStock(String barcode, String storeNumber) {
         ProductVariant variant = productVariantRepository.findByBarcode(barcode)

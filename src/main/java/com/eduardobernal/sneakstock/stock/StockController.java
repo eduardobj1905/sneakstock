@@ -35,4 +35,10 @@ public class StockController {
     public void receive(@RequestBody EntryRequest request) {
         stockService.receive(request.barcode(), request.storeNumber(), request.units());
     }
+    @PostMapping("/transfers")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void sendTransfer(@RequestBody TransferRequest request) {
+        stockService.sendTransfer(request.barcode(), request.originStoreNumber(),
+                request.destinationStoreNumber(), request.units());
+    }
 }

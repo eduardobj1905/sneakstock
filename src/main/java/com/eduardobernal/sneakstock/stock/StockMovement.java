@@ -1,4 +1,5 @@
 package com.eduardobernal.sneakstock.stock;
+import com.eduardobernal.sneakstock.store.Store;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -41,6 +42,9 @@ public class StockMovement {
 
     @Column(length = 255)
     private String note;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destination_store_id")
+    private Store destinationStore;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -51,5 +55,10 @@ public class StockMovement {
         this.type = type;
         this.quantity = quantity;
         this.note = note;
+    }
+    public static StockMovement transferOut(Stock origin, int units, Store destination) {
+        StockMovement movement = new StockMovement(origin, MovementType.TRANSFER_OUT, -units, null);
+        movement.destinationStore = destination;
+        return movement;
     }
 }
