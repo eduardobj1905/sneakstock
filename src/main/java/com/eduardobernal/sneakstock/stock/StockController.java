@@ -1,5 +1,6 @@
 package com.eduardobernal.sneakstock.stock;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,19 +29,19 @@ public class StockController {
 
     @PostMapping("/sales")
     @ResponseStatus(HttpStatus.CREATED)
-    public void sell(@RequestBody SaleRequest request) {
+    public void sell(@Valid @RequestBody SaleRequest request) {
         stockService.sell(request.barcode(), request.storeNumber(), request.units());
     }
 
     @PostMapping("/entries")
     @ResponseStatus(HttpStatus.CREATED)
-    public void receive(@RequestBody EntryRequest request) {
+    public void receive(@Valid @RequestBody EntryRequest request) {
         stockService.receive(request.barcode(), request.storeNumber(), request.units());
     }
 
     @PostMapping("/transfers")
     @ResponseStatus(HttpStatus.CREATED)
-    public void sendTransfer(@RequestBody TransferRequest request) {
+    public void sendTransfer(@Valid @RequestBody TransferRequest request) {
         stockService.sendTransfer(request.barcode(), request.originStoreNumber(),
                 request.destinationStoreNumber(), request.units());
     }
@@ -48,7 +49,7 @@ public class StockController {
     @PostMapping("/transfers/{transferId}/receptions")
     @ResponseStatus(HttpStatus.CREATED)
     public void receiveTransfer(@PathVariable Long transferId,
-                                @RequestBody TransferReceptionRequest request) {
+                                @Valid @RequestBody TransferReceptionRequest request) {
         stockService.receiveTransfer(transferId, request.storeNumber(), request.units());
     }
 }
