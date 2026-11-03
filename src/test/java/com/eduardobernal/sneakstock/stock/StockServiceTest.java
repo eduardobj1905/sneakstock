@@ -228,4 +228,125 @@ class StockServiceTest {
         assertThat(solStock.getQuantity()).isEqualTo(2);
         verify(stockMovementRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Recibe un traspaso completo: suma en destino y apunta TRANSFER_IN enlazado al envío")
+    void receiveTransfer() {
+        // Arrange: Sol envió 2 pares del Dunk US 9 a Gran Vía (envío 3); Gran Vía tiene 0
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 2, granVia);
+        Stock granViaStock = new Stock(us9, granVia);
+
+        when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
+        when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(false);
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0001"))
+                .thenReturn(Optional.of(granViaStock));
+
+        // Act: Gran Vía recibe los 2 pares
+        stockService.receiveTransfer(3L, "0001", 2);
+
+        // Assert: Gran Vía pasa a 2 y el movimiento va enlazado al envío, sin nota
+        assertThat(granViaStock.getQuantity()).isEqualTo(2);
+
+        ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
+        verify(stockMovementRepository).save(captor.capture());
+        StockMovement transferIn = captor.getValue();
+
+        assertThat(transferIn.getType()).isEqualTo(MovementType.TRANSFER_IN);
+        assertThat(transferIn.getQuantity()).isEqualTo(2);
+        assertThat(transferIn.getTransferOut()).isSameAs(transferOut);
+        assertThat(transferIn.getNote()).isNull();
+    }
+
+    @Test
+    @DisplayName("Recibe un traspaso incompleto: suma solo los pares que llegan y apunta cuántos faltan")
+    void receiveTransferWithMissingPairs() {
+        // Arrange: Sol envió 3 pares a Gran Vía (envío 3), pero solo llegan 2
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 3, granVia);
+        Stock granViaStock = new Stock(us9, granVia);
+
+        when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
+        when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(false);
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0001"))
+                .thenReturn(Optional.of(granViaStock));
+
+        // Act
+        stockService.receiveTransfer(3L, "0001", 2);
+
+        // Assert: entran 2 y la nota deja constancia del par que falta
+        assertThat(granViaStock.getQuantity()).isEqualTo(2);
+
+        ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
+        verify(stockMovementRepository).save(captor.capture());
+        assertThat(captor.getValue().getNote()).isEqualTo("Faltan 1 de 3 pares enviados");
+    }
+
+    @Test
+    @DisplayName("No recibe dos veces el mismo traspaso")
+    void receiveTransferTwice() {
+        // Arrange: el envío 3 ya tiene su recepción
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 1, granVia);
+
+        when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
+        when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(true);
+
+        // Act + Assert
+        assertThatThrownBy(() -> stockService.receiveTransfer(3L, "0001", 1))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya ha sido recibido");
+
+        verify(stockMovementRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Solo la tienda destino puede recibir el traspaso")
+    void receiveTransferInWrongStore() {
+        // Arrange: el envío 3 va a Gran Vía, pero intenta recibirlo Goya
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 1, granVia);
+
+        when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
+
+        // Act + Assert
+        assertThatThrownBy(() -> stockService.receiveTransfer(3L, "0003", 1))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no va dirigido a la tienda 0003");
+
+        verify(stockMovementRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("No recibe más pares de los que se enviaron")
+    void receiveMorePairsThanSent() {
+        // Arrange: se enviaron 2 pares a Gran Vía
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 2, granVia);
+
+        when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
+        when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(false);
+
+        // Act + Assert: intentar recibir 3
+        assertThatThrownBy(() -> stockService.receiveTransfer(3L, "0001", 3))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("entre 1 y 2");
+
+        verify(stockMovementRepository, never()).save(any());
+    }
 }

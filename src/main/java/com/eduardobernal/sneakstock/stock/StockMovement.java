@@ -46,6 +46,10 @@ public class StockMovement {
     @JoinColumn(name = "destination_store_id")
     private Store destinationStore;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transfer_out_id")
+    private StockMovement transferOut;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -59,6 +63,14 @@ public class StockMovement {
     public static StockMovement transferOut(Stock origin, int units, Store destination) {
         StockMovement movement = new StockMovement(origin, MovementType.TRANSFER_OUT, -units, null);
         movement.destinationStore = destination;
+        return movement;
+    }
+    public static StockMovement transferIn(Stock destination, int units, StockMovement transferOut) {
+        int sent = -transferOut.getQuantity();
+        String note = units < sent ? "Faltan " + (sent - units) + " de " + sent + " pares enviados" : null;
+
+        StockMovement movement = new StockMovement(destination, MovementType.TRANSFER_IN, units, note);
+        movement.transferOut = transferOut;
         return movement;
     }
 }

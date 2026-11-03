@@ -25,6 +25,7 @@ public class StockService {
                 .map(StoreStockResponse::from)
                 .toList();
     }
+
     @Transactional
     public void sell(String barcode, String storeNumber, int units) {
         Stock stock = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, storeNumber)
@@ -39,6 +40,7 @@ public class StockService {
 
         stockMovementRepository.save(new StockMovement(stock, MovementType.SALE, -units, null));
     }
+
     @Transactional
     public void receive(String barcode, String storeNumber, int units) {
         Stock stock = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, storeNumber)
@@ -52,6 +54,7 @@ public class StockService {
 
         stockMovementRepository.save(new StockMovement(stock, MovementType.ENTRY, units, null));
     }
+
     @Transactional
     public void sendTransfer(String barcode, String originStoreNumber, String destinationStoreNumber, int units) {
         if (originStoreNumber.equals(destinationStoreNumber)) {
@@ -76,6 +79,37 @@ public class StockService {
         origin.remove(units);
 
         stockMovementRepository.save(StockMovement.transferOut(origin, units, destination));
+    }
+
+    @Transactional
+    public void receiveTransfer(Long transferId, String storeNumber, int units) {
+        StockMovement transferOut = stockMovementRepository.findById(transferId)
+                .orElseThrow(() -> new IllegalArgumentException("No existe el traspaso " + transferId));
+
+        if (transferOut.getType() != MovementType.TRANSFER_OUT) {
+            throw new IllegalArgumentException("El movimiento " + transferId + " no es un envío de traspaso");
+        }
+
+        if (!transferOut.getDestinationStore().getStoreNumber().equals(storeNumber)) {
+            throw new IllegalStateException("El traspaso " + transferId + " no va dirigido a la tienda " + storeNumber);
+        }
+
+        if (stockMovementRepository.existsByTransferOutId(transferId)) {
+            throw new IllegalStateException("El traspaso " + transferId + " ya ha sido recibido");
+        }
+
+        int sent = -transferOut.getQuantity();
+        if (units <= 0 || units > sent) {
+            throw new IllegalArgumentException("Se pueden recibir entre 1 y " + sent + " pares");
+        }
+
+        String barcode = transferOut.getStock().getVariant().getBarcode();
+        Stock destination = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, storeNumber)
+                .orElseGet(() -> createStock(barcode, storeNumber));
+
+        destination.add(units);
+
+        stockMovementRepository.save(StockMovement.transferIn(destination, units, transferOut));
     }
 
     private Stock createStock(String barcode, String storeNumber) {
