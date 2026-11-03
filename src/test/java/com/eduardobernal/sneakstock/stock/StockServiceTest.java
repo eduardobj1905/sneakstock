@@ -2,14 +2,17 @@ package com.eduardobernal.sneakstock.stock;
 
 import com.eduardobernal.sneakstock.catalog.Product;
 import com.eduardobernal.sneakstock.catalog.ProductVariant;
+import com.eduardobernal.sneakstock.catalog.ProductVariantRepository;
 import com.eduardobernal.sneakstock.store.Store;
+import com.eduardobernal.sneakstock.store.StoreRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -21,8 +24,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import com.eduardobernal.sneakstock.catalog.ProductVariantRepository;
-import com.eduardobernal.sneakstock.store.StoreRepository;
 
 @ExtendWith(MockitoExtension.class)
 class StockServiceTest {
@@ -42,14 +43,39 @@ class StockServiceTest {
     @InjectMocks
     private StockService stockService;
 
+    // Catálogo: Dunk Low en US 9 y US 10, Samba OG en US 9
+    private ProductVariant dunkUs9;
+    private ProductVariant dunkUs10;
+    private ProductVariant sambaUs9;
+
+    // Tiendas: Alcalá está cerrada
+    private Store granVia;
+    private Store sol;
+    private Store goya;
+    private Store alcala;
+
+    @BeforeEach
+    void setUp() {
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        Product samba = new Product("IE3437", "Adidas", "Samba OG", "White/Black", new BigDecimal("120.00"));
+        dunkUs9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        dunkUs10 = new ProductVariant(dunk, "10", "44", "8400000000028");
+        sambaUs9 = new ProductVariant(samba, "9", "42 2/3", "8400000000035");
+
+        granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        goya = new Store("0003", "Goya", "Calle Goya 50, Madrid", "+34 910 000 003");
+        alcala = new Store("0004", "Alcalá", "Calle Alcalá 100, Madrid", "+34 910 000 004");
+        alcala.close();
+    }
+
+    // --- Venta ---
+
     @Test
     @DisplayName("No vende si hay menos pares de los que se piden, y no apunta ningún movimiento")
     void sellWithInsufficientStock() {
         // Arrange: Goya tiene 1 par del Dunk US 9
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store goya = new Store("0003", "Goya", "Calle Goya 50, Madrid", "+34 910 000 003");
-        Stock stock = new Stock(us9, goya);
+        Stock stock = new Stock(dunkUs9, goya);
         stock.add(1);
 
         when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0003"))
@@ -69,10 +95,7 @@ class StockServiceTest {
     @DisplayName("Vende si hay pares suficientes: resta el stock y apunta el movimiento")
     void sellWithEnoughStock() {
         // Arrange: Sol tiene 3 pares del Dunk US 9
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Stock stock = new Stock(us9, sol);
+        Stock stock = new Stock(dunkUs9, sol);
         stock.add(3);
 
         when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0002"))
@@ -89,12 +112,8 @@ class StockServiceTest {
     @Test
     @DisplayName("No vende si la tienda está cerrada, aunque tenga pares")
     void sellInClosedStore() {
-        // Arrange: Alcalá tiene 6 pares del Dunk US 9, pero está cerrada
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store alcala = new Store("0004", "Alcalá", "Calle Alcalá 100, Madrid", "+34 910 000 004");
-        alcala.close();
-        Stock stock = new Stock(us9, alcala);
+        // Arrange: Alcalá (cerrada) tiene 6 pares del Dunk US 9
+        Stock stock = new Stock(dunkUs9, alcala);
         stock.add(6);
 
         when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0004"))
@@ -110,14 +129,13 @@ class StockServiceTest {
         verify(stockMovementRepository, never()).save(any());
     }
 
+    // --- Entrada de mercancía ---
+
     @Test
     @DisplayName("Entrada de una talla que la tienda ya tenía: suma los pares sin crear fila nueva")
     void receiveExistingStock() {
         // Arrange: Gran Vía tiene 2 pares del Dunk US 10
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us10 = new ProductVariant(dunk, "10", "44", "8400000000028");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-        Stock stock = new Stock(us10, granVia);
+        Stock stock = new Stock(dunkUs10, granVia);
         stock.add(2);
 
         when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000028", "0001"))
@@ -136,14 +154,10 @@ class StockServiceTest {
     @DisplayName("Entrada de una talla que la tienda nunca ha tenido: crea la fila con los pares recibidos")
     void receiveNewSize() {
         // Arrange: Gran Vía nunca ha tenido el Samba US 9
-        Product samba = new Product("IE3437", "Adidas", "Samba OG", "White/Black", new BigDecimal("120.00"));
-        ProductVariant us9 = new ProductVariant(samba, "9", "42 2/3", "8400000000035");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-
         when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000035", "0001"))
                 .thenReturn(Optional.empty());
         when(productVariantRepository.findByBarcode("8400000000035"))
-                .thenReturn(Optional.of(us9));
+                .thenReturn(Optional.of(sambaUs9));
         when(storeRepository.findByStoreNumber("0001"))
                 .thenReturn(Optional.of(granVia));
         when(stockRepository.save(any(Stock.class)))
@@ -162,15 +176,13 @@ class StockServiceTest {
         verify(stockMovementRepository).save(any(StockMovement.class));
     }
 
+    // --- Envío de traspaso ---
+
     @Test
     @DisplayName("Envía un traspaso: resta en origen y apunta TRANSFER_OUT con la tienda destino")
     void sendTransfer() {
-        // Arrange: Sol tiene 2 pares del Dunk US 9; Gran Vía está abierta
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-        Stock solStock = new Stock(us9, sol);
+        // Arrange: Sol tiene 2 pares del Dunk US 9
+        Stock solStock = new Stock(dunkUs9, sol);
         solStock.add(2);
 
         when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0002"))
@@ -207,12 +219,7 @@ class StockServiceTest {
     @DisplayName("No envía un traspaso a una tienda cerrada: ni resta ni apunta movimiento")
     void sendTransferToClosedStore() {
         // Arrange: Sol tiene 2 pares; Alcalá está cerrada
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Store alcala = new Store("0004", "Alcalá", "Calle Alcalá 100, Madrid", "+34 910 000 004");
-        alcala.close();
-        Stock solStock = new Stock(us9, sol);
+        Stock solStock = new Stock(dunkUs9, sol);
         solStock.add(2);
 
         when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0002"))
@@ -229,16 +236,14 @@ class StockServiceTest {
         verify(stockMovementRepository, never()).save(any());
     }
 
+    // --- Recepción de traspaso ---
+
     @Test
     @DisplayName("Recibe un traspaso completo: suma en destino y apunta TRANSFER_IN enlazado al envío")
     void receiveTransfer() {
         // Arrange: Sol envió 2 pares del Dunk US 9 a Gran Vía (envío 3); Gran Vía tiene 0
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 2, granVia);
-        Stock granViaStock = new Stock(us9, granVia);
+        StockMovement transferOut = StockMovement.transferOut(new Stock(dunkUs9, sol), 2, granVia);
+        Stock granViaStock = new Stock(dunkUs9, granVia);
 
         when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
         when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(false);
@@ -265,12 +270,8 @@ class StockServiceTest {
     @DisplayName("Recibe un traspaso incompleto: suma solo los pares que llegan y apunta cuántos faltan")
     void receiveTransferWithMissingPairs() {
         // Arrange: Sol envió 3 pares a Gran Vía (envío 3), pero solo llegan 2
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 3, granVia);
-        Stock granViaStock = new Stock(us9, granVia);
+        StockMovement transferOut = StockMovement.transferOut(new Stock(dunkUs9, sol), 3, granVia);
+        Stock granViaStock = new Stock(dunkUs9, granVia);
 
         when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
         when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(false);
@@ -292,11 +293,7 @@ class StockServiceTest {
     @DisplayName("No recibe dos veces el mismo traspaso")
     void receiveTransferTwice() {
         // Arrange: el envío 3 ya tiene su recepción
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 1, granVia);
+        StockMovement transferOut = StockMovement.transferOut(new Stock(dunkUs9, sol), 1, granVia);
 
         when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
         when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(true);
@@ -313,11 +310,7 @@ class StockServiceTest {
     @DisplayName("Solo la tienda destino puede recibir el traspaso")
     void receiveTransferInWrongStore() {
         // Arrange: el envío 3 va a Gran Vía, pero intenta recibirlo Goya
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 1, granVia);
+        StockMovement transferOut = StockMovement.transferOut(new Stock(dunkUs9, sol), 1, granVia);
 
         when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
 
@@ -333,11 +326,7 @@ class StockServiceTest {
     @DisplayName("No recibe más pares de los que se enviaron")
     void receiveMorePairsThanSent() {
         // Arrange: se enviaron 2 pares a Gran Vía
-        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
-        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
-        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
-        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
-        StockMovement transferOut = StockMovement.transferOut(new Stock(us9, sol), 2, granVia);
+        StockMovement transferOut = StockMovement.transferOut(new Stock(dunkUs9, sol), 2, granVia);
 
         when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
         when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(false);
