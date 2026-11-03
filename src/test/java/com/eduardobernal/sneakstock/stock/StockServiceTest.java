@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import com.eduardobernal.sneakstock.catalog.ProductVariantRepository;
 import com.eduardobernal.sneakstock.store.StoreRepository;
@@ -84,6 +85,7 @@ class StockServiceTest {
         assertThat(stock.getQuantity()).isEqualTo(2);
         verify(stockMovementRepository).save(any(StockMovement.class));
     }
+
     @Test
     @DisplayName("No vende si la tienda está cerrada, aunque tenga pares")
     void sellInClosedStore() {
@@ -107,6 +109,7 @@ class StockServiceTest {
         assertThat(stock.getQuantity()).isEqualTo(6);
         verify(stockMovementRepository, never()).save(any());
     }
+
     @Test
     @DisplayName("Entrada de una talla que la tienda ya tenía: suma los pares sin crear fila nueva")
     void receiveExistingStock() {
@@ -157,5 +160,72 @@ class StockServiceTest {
         assertThat(created.getStore()).isSameAs(granVia);
         assertThat(created.getQuantity()).isEqualTo(4);
         verify(stockMovementRepository).save(any(StockMovement.class));
+    }
+
+    @Test
+    @DisplayName("Envía un traspaso: resta en origen y apunta TRANSFER_OUT con la tienda destino")
+    void sendTransfer() {
+        // Arrange: Sol tiene 2 pares del Dunk US 9; Gran Vía está abierta
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        Store granVia = new Store("0001", "Gran Vía", "Calle Gran Vía 30, Madrid", "+34 910 000 001");
+        Stock solStock = new Stock(us9, sol);
+        solStock.add(2);
+
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0002"))
+                .thenReturn(Optional.of(solStock));
+        when(storeRepository.findByStoreNumber("0001"))
+                .thenReturn(Optional.of(granVia));
+
+        // Act: Sol envía 1 par a Gran Vía
+        stockService.sendTransfer("8400000000011", "0002", "0001", 1);
+
+        // Assert: Sol pasa a 1 y el movimiento guardado es correcto
+        assertThat(solStock.getQuantity()).isEqualTo(1);
+
+        ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
+        verify(stockMovementRepository).save(captor.capture());
+        StockMovement movement = captor.getValue();
+
+        assertThat(movement.getType()).isEqualTo(MovementType.TRANSFER_OUT);
+        assertThat(movement.getQuantity()).isEqualTo(-1);
+        assertThat(movement.getDestinationStore()).isSameAs(granVia);
+    }
+
+    @Test
+    @DisplayName("No envía un traspaso a la misma tienda, y ni siquiera consulta la base de datos")
+    void sendTransferToSameStore() {
+        assertThatThrownBy(() -> stockService.sendTransfer("8400000000011", "0002", "0002", 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no pueden ser la misma");
+
+        verifyNoInteractions(stockRepository, storeRepository, stockMovementRepository);
+    }
+
+    @Test
+    @DisplayName("No envía un traspaso a una tienda cerrada: ni resta ni apunta movimiento")
+    void sendTransferToClosedStore() {
+        // Arrange: Sol tiene 2 pares; Alcalá está cerrada
+        Product dunk = new Product("DD1391-100", "Nike", "Dunk Low", "White/Black", new BigDecimal("119.99"));
+        ProductVariant us9 = new ProductVariant(dunk, "9", "42.5", "8400000000011");
+        Store sol = new Store("0002", "Sol", "Puerta del Sol 5, Madrid", "+34 910 000 002");
+        Store alcala = new Store("0004", "Alcalá", "Calle Alcalá 100, Madrid", "+34 910 000 004");
+        alcala.close();
+        Stock solStock = new Stock(us9, sol);
+        solStock.add(2);
+
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0002"))
+                .thenReturn(Optional.of(solStock));
+        when(storeRepository.findByStoreNumber("0004"))
+                .thenReturn(Optional.of(alcala));
+
+        // Act + Assert
+        assertThatThrownBy(() -> stockService.sendTransfer("8400000000011", "0002", "0004", 1))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("destino");
+
+        assertThat(solStock.getQuantity()).isEqualTo(2);
+        verify(stockMovementRepository, never()).save(any());
     }
 }
