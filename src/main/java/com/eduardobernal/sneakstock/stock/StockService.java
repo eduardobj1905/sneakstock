@@ -2,6 +2,8 @@ package com.eduardobernal.sneakstock.stock;
 
 import com.eduardobernal.sneakstock.catalog.ProductVariant;
 import com.eduardobernal.sneakstock.catalog.ProductVariantRepository;
+import com.eduardobernal.sneakstock.common.BusinessRuleException;
+import com.eduardobernal.sneakstock.common.NotFoundException;
 import com.eduardobernal.sneakstock.store.Store;
 import com.eduardobernal.sneakstock.store.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,11 +31,11 @@ public class StockService {
     @Transactional
     public void sell(String barcode, String storeNumber, int units) {
         Stock stock = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, storeNumber)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new NotFoundException(
                         "La tienda " + storeNumber + " no tiene la talla " + barcode));
 
         if (!stock.getStore().isActive()) {
-            throw new IllegalStateException("La tienda " + storeNumber + " está cerrada");
+            throw new BusinessRuleException("La tienda " + storeNumber + " está cerrada");
         }
 
         stock.remove(units);
@@ -47,7 +49,7 @@ public class StockService {
                 .orElseGet(() -> createStock(barcode, storeNumber));
 
         if (!stock.getStore().isActive()) {
-            throw new IllegalStateException("La tienda " + storeNumber + " está cerrada");
+            throw new BusinessRuleException("La tienda " + storeNumber + " está cerrada");
         }
 
         stock.add(units);
@@ -62,18 +64,18 @@ public class StockService {
         }
 
         Stock origin = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, originStoreNumber)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new NotFoundException(
                         "La tienda " + originStoreNumber + " no tiene la talla " + barcode));
 
         if (!origin.getStore().isActive()) {
-            throw new IllegalStateException("La tienda " + originStoreNumber + " está cerrada");
+            throw new BusinessRuleException("La tienda " + originStoreNumber + " está cerrada");
         }
 
         Store destination = storeRepository.findByStoreNumber(destinationStoreNumber)
-                .orElseThrow(() -> new IllegalArgumentException("No existe la tienda " + destinationStoreNumber));
+                .orElseThrow(() -> new NotFoundException("No existe la tienda " + destinationStoreNumber));
 
         if (!destination.isActive()) {
-            throw new IllegalStateException("La tienda destino " + destinationStoreNumber + " está cerrada");
+            throw new BusinessRuleException("La tienda destino " + destinationStoreNumber + " está cerrada");
         }
 
         origin.remove(units);
@@ -84,18 +86,18 @@ public class StockService {
     @Transactional
     public void receiveTransfer(Long transferId, String storeNumber, int units) {
         StockMovement transferOut = stockMovementRepository.findById(transferId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el traspaso " + transferId));
+                .orElseThrow(() -> new NotFoundException("No existe el traspaso " + transferId));
 
         if (transferOut.getType() != MovementType.TRANSFER_OUT) {
             throw new IllegalArgumentException("El movimiento " + transferId + " no es un envío de traspaso");
         }
 
         if (!transferOut.getDestinationStore().getStoreNumber().equals(storeNumber)) {
-            throw new IllegalStateException("El traspaso " + transferId + " no va dirigido a la tienda " + storeNumber);
+            throw new BusinessRuleException("El traspaso " + transferId + " no va dirigido a la tienda " + storeNumber);
         }
 
         if (stockMovementRepository.existsByTransferOutId(transferId)) {
-            throw new IllegalStateException("El traspaso " + transferId + " ya ha sido recibido");
+            throw new BusinessRuleException("El traspaso " + transferId + " ya ha sido recibido");
         }
 
         int sent = -transferOut.getQuantity();
@@ -114,9 +116,9 @@ public class StockService {
 
     private Stock createStock(String barcode, String storeNumber) {
         ProductVariant variant = productVariantRepository.findByBarcode(barcode)
-                .orElseThrow(() -> new IllegalArgumentException("No existe ninguna talla con el código " + barcode));
+                .orElseThrow(() -> new NotFoundException("No existe ninguna talla con el código " + barcode));
         Store store = storeRepository.findByStoreNumber(storeNumber)
-                .orElseThrow(() -> new IllegalArgumentException("No existe la tienda " + storeNumber));
+                .orElseThrow(() -> new NotFoundException("No existe la tienda " + storeNumber));
 
         return stockRepository.save(new Stock(variant, store));
     }

@@ -3,6 +3,7 @@ package com.eduardobernal.sneakstock.stock;
 import com.eduardobernal.sneakstock.catalog.Product;
 import com.eduardobernal.sneakstock.catalog.ProductVariant;
 import com.eduardobernal.sneakstock.catalog.ProductVariantRepository;
+import com.eduardobernal.sneakstock.common.BusinessRuleException;
 import com.eduardobernal.sneakstock.store.Store;
 import com.eduardobernal.sneakstock.store.StoreRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +84,7 @@ class StockServiceTest {
 
         // Act + Assert: intentar vender 5 lanza la excepción
         assertThatThrownBy(() -> stockService.sell("8400000000011", "0003", 5))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Stock insuficiente");
 
         // Assert: el stock no cambia y no se guarda ningún movimiento
@@ -121,7 +122,7 @@ class StockServiceTest {
 
         // Act + Assert: vender lanza la excepción de tienda cerrada
         assertThatThrownBy(() -> stockService.sell("8400000000011", "0004", 1))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("está cerrada");
 
         // Assert: el stock no cambia y no se guarda ningún movimiento
@@ -229,7 +230,7 @@ class StockServiceTest {
 
         // Act + Assert
         assertThatThrownBy(() -> stockService.sendTransfer("8400000000011", "0002", "0004", 1))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("destino");
 
         assertThat(solStock.getQuantity()).isEqualTo(2);
@@ -300,7 +301,7 @@ class StockServiceTest {
 
         // Act + Assert
         assertThatThrownBy(() -> stockService.receiveTransfer(3L, "0001", 1))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("ya ha sido recibido");
 
         verify(stockMovementRepository, never()).save(any());
@@ -316,7 +317,7 @@ class StockServiceTest {
 
         // Act + Assert
         assertThatThrownBy(() -> stockService.receiveTransfer(3L, "0003", 1))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("no va dirigido a la tienda 0003");
 
         verify(stockMovementRepository, never()).save(any());

@@ -1,6 +1,7 @@
 package com.eduardobernal.sneakstock.stock;
 
 import com.eduardobernal.sneakstock.catalog.ProductVariant;
+import com.eduardobernal.sneakstock.common.BusinessRuleException;
 import com.eduardobernal.sneakstock.store.Store;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -59,7 +60,7 @@ public class Stock {
             throw new IllegalArgumentException("La cantidad debe ser mayor que 0");
         }
         if (units > quantity) {
-            throw new IllegalStateException(
+            throw new BusinessRuleException(
                     "Stock insuficiente: hay " + quantity + " pares y se piden " + units);
         }
         quantity -= units;
