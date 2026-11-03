@@ -6,6 +6,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.PathVariable;
+
 import java.util.List;
 
 @RestController
@@ -18,5 +24,31 @@ public class StockController {
     @GetMapping
     public List<StoreStockResponse> findAvailable(@RequestParam String barcode) {
         return stockService.findAvailableByBarcode(barcode);
+    }
+
+    @PostMapping("/sales")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void sell(@RequestBody SaleRequest request) {
+        stockService.sell(request.barcode(), request.storeNumber(), request.units());
+    }
+
+    @PostMapping("/entries")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void receive(@RequestBody EntryRequest request) {
+        stockService.receive(request.barcode(), request.storeNumber(), request.units());
+    }
+
+    @PostMapping("/transfers")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void sendTransfer(@RequestBody TransferRequest request) {
+        stockService.sendTransfer(request.barcode(), request.originStoreNumber(),
+                request.destinationStoreNumber(), request.units());
+    }
+
+    @PostMapping("/transfers/{transferId}/receptions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void receiveTransfer(@PathVariable Long transferId,
+                                @RequestBody TransferReceptionRequest request) {
+        stockService.receiveTransfer(transferId, request.storeNumber(), request.units());
     }
 }

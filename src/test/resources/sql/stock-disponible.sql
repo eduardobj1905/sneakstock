@@ -14,4 +14,5 @@ INSERT INTO stock (variant_id, store_id, quantity)
 SELECT v.id, s.id,
        CASE s.store_number WHEN 'T001' THEN 3 WHEN 'T002' THEN 5 WHEN 'T003' THEN 0 ELSE 7 END
 FROM product_variant v, store s
-WHERE v.barcode = '0000000000001';
+WHERE v.barcode = '0000000000001'
+  AND s.store_number IN ('T001', 'T002', 'T003', 'T004');
