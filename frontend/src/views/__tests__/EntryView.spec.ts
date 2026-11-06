@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import EntryView from '../EntryView.vue'
-import { receive } from '@/api/stock'
+import { receiveDelivery } from '@/api/stock'
 import { findVariant, type Variant } from '@/api/catalog'
 
-vi.mock('@/api/stock', () => ({ receive: vi.fn() }))
-vi.mock('@/api/catalog', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/api/catalog')>()),
-  findVariant: vi.fn(),
-}))
+vi.mock('@/api/stock', () => ({ receiveDelivery: vi.fn() }))
+vi.mock('@/api/catalog', () => ({ findVariant: vi.fn() }))
+
+const dunkUs9: Variant = {
+  barcode: '8400000000011',
+  brand: 'Nike',
+  model: 'Dunk Low',
+  color: 'White/Black',
+  sizeUs: '9',
+  sizeEu: '42.5',
+}
 
 const sambaUs9: Variant = {
   barcode: '8400000000035',
@@ -19,65 +25,89 @@ const sambaUs9: Variant = {
   sizeEu: '42 2/3',
 }
 
-async function scan(wrapper: ReturnType<typeof mount>, code: string) {
+async function startDelivery(wrapper: VueWrapper, note: string) {
+  await wrapper.find('input').setValue(note)
+  await wrapper.find('form').trigger('submit')
+  await flushPromises()
+}
+
+async function scan(wrapper: VueWrapper, code: string) {
   await wrapper.find('input').setValue(code)
   await wrapper.find('form').trigger('submit')
   await flushPromises()
 }
 
+function registerButton(wrapper: VueWrapper) {
+  return wrapper.findAll('button').find((button) => button.text().startsWith('Registrar entrada'))!
+}
+
 describe('EntryView', () => {
   beforeEach(() => {
-    vi.mocked(receive).mockReset()
+    vi.mocked(receiveDelivery).mockReset()
     vi.mocked(findVariant).mockReset()
+    vi.mocked(findVariant).mockImplementation(async (code) => {
+      if (code === dunkUs9.barcode) return dunkUs9
+      if (code === sambaUs9.barcode) return sambaUs9
+      throw new Error(`No existe ninguna talla con el código ${code}`)
+    })
   })
 
-  it('al escanear enseña la zapatilla y todavía no registra nada', async () => {
-    vi.mocked(findVariant).mockResolvedValue(sambaUs9)
+  it('escanear la misma zapatilla dos veces suma unidades en la misma línea', async () => {
     const wrapper = mount(EntryView)
+    await startDelivery(wrapper, 'ALB-0045')
 
+    await scan(wrapper, '8400000000011')
+    await scan(wrapper, '8400000000011')
     await scan(wrapper, '8400000000035')
 
-    expect(wrapper.text()).toContain('Adidas Samba OG')
-    expect(wrapper.text()).toContain('US 9 · EU 42 2/3')
-    expect(wrapper.find('button[type="submit"]').text()).toBe('Registrar entrada')
-    expect(receive).not.toHaveBeenCalled()
+    expect(wrapper.findAll('li')).toHaveLength(2)
+    expect(findVariant).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('3 unidades')
+    expect(receiveDelivery).not.toHaveBeenCalled()
   })
 
-  it('al confirmar registra la entrada y el mensaje dice qué zapatilla era', async () => {
-    vi.mocked(findVariant).mockResolvedValue(sambaUs9)
-    vi.mocked(receive).mockResolvedValue()
+  it('un código que no existe se avisa y no entra en la lista', async () => {
     const wrapper = mount(EntryView)
-
-    await scan(wrapper, '8400000000035')
-    await wrapper.find('button[aria-label="Añadir un par"]').trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    expect(receive).toHaveBeenCalledWith('8400000000035', '0001', 2)
-    expect(wrapper.text()).toContain(
-      'Entrada registrada: 2 pares de Adidas Samba OG · US 9 / EU 42 2/3 (8400000000035)',
-    )
-    expect((wrapper.find('input').element as HTMLInputElement).value).toBe('')
-  })
-
-  it('un código que no existe se avisa al escanear, sin registrar nada', async () => {
-    vi.mocked(findVariant).mockRejectedValue(new Error('No existe ninguna talla con el código 999'))
-    const wrapper = mount(EntryView)
+    await startDelivery(wrapper, 'ALB-0045')
 
     await scan(wrapper, '999')
 
     expect(wrapper.text()).toContain('No existe ninguna talla con el código 999')
-    expect(receive).not.toHaveBeenCalled()
+    expect(wrapper.findAll('li')).toHaveLength(0)
+    expect(registerButton(wrapper).attributes('disabled')).toBeDefined()
   })
 
-  it('si se escanea otro código, desaparece la zapatilla anterior', async () => {
-    vi.mocked(findVariant).mockResolvedValue(sambaUs9)
+  it('al registrar envía todo el albarán de una vez y vuelve a empezar', async () => {
+    vi.mocked(receiveDelivery).mockResolvedValue()
     const wrapper = mount(EntryView)
-
+    await startDelivery(wrapper, 'ALB-0045')
+    await scan(wrapper, '8400000000011')
+    await scan(wrapper, '8400000000011')
     await scan(wrapper, '8400000000035')
-    await wrapper.find('input').setValue('8400000000011')
 
-    expect(wrapper.text()).not.toContain('Adidas Samba OG')
-    expect(wrapper.find('button[type="submit"]').text()).toBe('Comprobar código')
+    await registerButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(receiveDelivery).toHaveBeenCalledWith('ALB-0045', '0001', [
+      { barcode: '8400000000035', units: 1 },
+      { barcode: '8400000000011', units: 2 },
+    ])
+    expect(wrapper.text()).toContain('Albarán ALB-0045 registrado: 3 unidades de 2 referencias')
+    expect(wrapper.find('input').attributes('placeholder')).toContain('número de albarán')
+  })
+
+  it('si el backend rechaza el albarán, la lista se conserva para corregirla', async () => {
+    vi.mocked(receiveDelivery).mockRejectedValue(
+      new Error('El albarán ALB-0045 ya ha sido registrado'),
+    )
+    const wrapper = mount(EntryView)
+    await startDelivery(wrapper, 'ALB-0045')
+    await scan(wrapper, '8400000000011')
+
+    await registerButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('El albarán ALB-0045 ya ha sido registrado')
+    expect(wrapper.findAll('li')).toHaveLength(1)
   })
 })
