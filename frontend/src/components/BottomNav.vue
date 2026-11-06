@@ -15,6 +15,11 @@ const items = [
     label: 'Vender',
     icon: 'M2 3h3l2.5 12h11L21 7H6.2M9 20h.01M18 20h.01',
   },
+  {
+    to: '/entradas',
+    label: 'Entradas',
+    icon: 'M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Zm0 0 9 4.5 9-4.5M12 12v9',
+  },
 ]
 </script>
 
