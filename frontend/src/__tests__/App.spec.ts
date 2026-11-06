@@ -9,6 +9,7 @@ describe('App', () => {
     const wrapper = mount(App, { global: { plugins: [router] } })
 
     expect(wrapper.text()).toContain('SneakStock')
-    expect(wrapper.text()).toContain('Tienda 0001')
+    expect(wrapper.text()).toContain('Gran Vía')
+    expect(wrapper.text()).toContain('Nº de tienda: 0001')
   })
 })

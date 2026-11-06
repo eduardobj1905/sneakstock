@@ -10,7 +10,6 @@ export async function findAvailableStock(barcode: string): Promise<StoreStock[]>
   const response = await fetch(`/api/stock?barcode=${encodeURIComponent(barcode)}`)
 
   if (!response.ok) {
-    // El backend responde los errores en formato ProblemDetail: el motivo viene en "detail"
     const problem = await response.json().catch(() => null)
     throw new Error(problem?.detail ?? 'No se ha podido consultar el stock')
   }
