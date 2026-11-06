@@ -42,6 +42,10 @@ public class StockMovement {
 
     @Column(length = 255)
     private String note;
+
+    @Column(name = "delivery_note", length = 30)
+    private String deliveryNote;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "destination_store_id")
     private Store destinationStore;
@@ -60,11 +64,19 @@ public class StockMovement {
         this.quantity = quantity;
         this.note = note;
     }
+
+    public static StockMovement deliveryEntry(Stock stock, int units, String deliveryNote) {
+        StockMovement movement = new StockMovement(stock, MovementType.ENTRY, units, "Albarán " + deliveryNote);
+        movement.deliveryNote = deliveryNote;
+        return movement;
+    }
+
     public static StockMovement transferOut(Stock origin, int units, Store destination) {
         StockMovement movement = new StockMovement(origin, MovementType.TRANSFER_OUT, -units, null);
         movement.destinationStore = destination;
         return movement;
     }
+
     public static StockMovement transferIn(Stock destination, int units, StockMovement transferOut) {
         int sent = -transferOut.getQuantity();
         String note = units < sent ? "Faltan " + (sent - units) + " de " + sent + " pares enviados" : null;

@@ -27,6 +27,11 @@ public class StockController {
         return stockService.findAvailableByBarcode(barcode);
     }
 
+    @GetMapping("/stores/{storeNumber}")
+    public StoreStockResponse findInStore(@PathVariable String storeNumber, @RequestParam String barcode) {
+        return stockService.findInStore(barcode, storeNumber);
+    }
+
     @PostMapping("/sales")
     @ResponseStatus(HttpStatus.CREATED)
     public void sell(@Valid @RequestBody SaleRequest request) {
@@ -37,6 +42,12 @@ public class StockController {
     @ResponseStatus(HttpStatus.CREATED)
     public void receive(@Valid @RequestBody EntryRequest request) {
         stockService.receive(request.barcode(), request.storeNumber(), request.units());
+    }
+
+    @PostMapping("/deliveries")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void receiveDelivery(@Valid @RequestBody DeliveryRequest request) {
+        stockService.receiveDelivery(request.deliveryNote(), request.storeNumber(), request.lines());
     }
 
     @PostMapping("/transfers")

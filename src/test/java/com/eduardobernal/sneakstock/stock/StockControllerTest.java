@@ -83,4 +83,16 @@ class StockControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("La tienda de origen y la de destino no pueden ser la misma"));
     }
+
+    @Test
+    @DisplayName("Un albarán sin zapatillas devuelve 400")
+    void emptyDeliveryReturns400() throws Exception {
+        mockMvc.perform(post("/api/stock/deliveries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deliveryNote\": \"ALB-0045\", \"storeNumber\": \"0001\", \"lines\": []}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.lines").value("El albarán tiene que tener al menos una zapatilla"));
+
+        verifyNoInteractions(stockService);
+    }
 }
