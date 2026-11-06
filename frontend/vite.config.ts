@@ -17,4 +17,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      // En desarrollo, las llamadas a /api se reenvían al backend de Spring Boot
+      '/api': 'http://localhost:8080',
+    },
+  },
 })
