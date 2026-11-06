@@ -1,3 +1,5 @@
+import { toError } from './http'
+
 // Lo que devuelve GET /api/stock: una tienda con pares de la talla buscada
 export interface StoreStock {
   storeNumber: string
@@ -16,6 +18,18 @@ export async function findAvailableStock(barcode: string): Promise<StoreStock[]>
   return response.json()
 }
 
+export async function findStockInStore(barcode: string, storeNumber: string): Promise<StoreStock> {
+  const response = await fetch(
+    `/api/stock/stores/${encodeURIComponent(storeNumber)}?barcode=${encodeURIComponent(barcode)}`,
+  )
+
+  if (!response.ok) {
+    throw await toError(response, 'No se ha podido consultar el stock de la tienda')
+  }
+
+  return response.json()
+}
+
 export async function sell(barcode: string, storeNumber: string, units: number): Promise<void> {
   const response = await fetch('/api/stock/sales', {
     method: 'POST',
@@ -28,14 +42,35 @@ export async function sell(barcode: string, storeNumber: string, units: number):
   }
 }
 
-// Convierte la respuesta de error del backend (ProblemDetail) en un Error con un mensaje legible
-async function toError(response: Response, fallback: string): Promise<Error> {
-  const problem = await response.json().catch(() => null)
+export async function receive(barcode: string, storeNumber: string, units: number): Promise<void> {
+  const response = await fetch('/api/stock/entries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ barcode, storeNumber, units }),
+  })
 
-  // Errores de validación: un mensaje por cada campo que falla
-  if (problem?.errors) {
-    return new Error(Object.values(problem.errors).join('. '))
+  if (!response.ok) {
+    throw await toError(response, 'No se ha podido registrar la entrada')
   }
+}
 
-  return new Error(problem?.detail ?? fallback)
+export interface DeliveryLine {
+  barcode: string
+  units: number
+}
+
+export async function receiveDelivery(
+  deliveryNote: string,
+  storeNumber: string,
+  lines: DeliveryLine[],
+): Promise<void> {
+  const response = await fetch('/api/stock/deliveries', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deliveryNote, storeNumber, lines }),
+  })
+
+  if (!response.ok) {
+    throw await toError(response, 'No se ha podido registrar el albarán')
+  }
 }

@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref, useTemplateRef } from 'vue'
-import { findAvailableStock, type StoreStock } from '@/api/stock'
+import { findAvailableStock, findStockInStore, type StoreStock } from '@/api/stock'
+import { findVariant, type Variant } from '@/api/catalog'
 import { currentStore } from '@/currentStore'
+import ProductCard from '@/components/ProductCard.vue'
 
 const barcode = ref('')
-const lastBarcode = ref('')
-const stores = ref<StoreStock[]>([])
-const searched = ref(false)
+const variant = ref<Variant | null>(null)
+const myStock = ref<StoreStock | null>(null)
+// null = todavía no se han pedido; solo se consultan si el dependiente pulsa el botón
+const otherStores = ref<StoreStock[] | null>(null)
 const loading = ref(false)
+const loadingOthers = ref(false)
 const error = ref('')
 
 const barcodeInput = useTemplateRef<HTMLInputElement>('barcodeInput')
@@ -21,11 +25,18 @@ async function search() {
 
   loading.value = true
   error.value = ''
+  otherStores.value = null
   try {
-    stores.value = await findAvailableStock(code)
-    lastBarcode.value = code
-    searched.value = true
+    // Qué zapatilla es y cuántas hay en mi tienda. Si el código no existe, findVariant falla.
+    const [foundVariant, foundStock] = await Promise.all([
+      findVariant(code),
+      findStockInStore(code, currentStore.number),
+    ])
+    variant.value = foundVariant
+    myStock.value = foundStock
   } catch (e) {
+    variant.value = null
+    myStock.value = null
     error.value = e instanceof Error ? e.message : 'Error inesperado'
   } finally {
     loading.value = false
@@ -35,8 +46,20 @@ async function search() {
   }
 }
 
-function isCurrentStore(store: StoreStock): boolean {
-  return store.storeNumber === currentStore.number
+// Carga bajo demanda: las demás tiendas solo cuando el cliente pregunta por ellas
+async function showOtherStores() {
+  if (!variant.value) return
+
+  loadingOthers.value = true
+  error.value = ''
+  try {
+    const stores = await findAvailableStock(variant.value.barcode)
+    otherStores.value = stores.filter((store) => store.storeNumber !== currentStore.number)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error inesperado'
+  } finally {
+    loadingOthers.value = false
+  }
 }
 </script>
 
@@ -82,43 +105,94 @@ function isCurrentStore(store: StoreStock): boolean {
       {{ error }}
     </p>
 
-    <template v-else-if="searched">
-      <p class="text-sm text-slate-500">
-        Resultados para <span class="font-semibold text-navy-700">{{ lastBarcode }}</span>
-      </p>
+    <template v-if="variant && myStock">
+      <ProductCard :variant="variant" />
 
-      <p
-        v-if="stores.length === 0"
-        class="rounded-xl bg-white px-4 py-6 text-center text-slate-500 shadow-sm"
+      <!-- Mi tienda: lo primero que necesita saber el dependiente -->
+      <div
+        class="flex items-center justify-between rounded-xl px-4 py-4 shadow-sm"
+        :class="
+          myStock.quantity > 0
+            ? 'bg-emerald-50 ring-2 ring-emerald-500'
+            : 'bg-amber-50 ring-2 ring-amber-400'
+        "
       >
-        No hay pares de esta talla en ninguna tienda abierta.
-      </p>
+        <div>
+          <p class="text-xs font-semibold tracking-widest text-slate-500 uppercase">En tu tienda</p>
+          <p class="font-semibold text-navy-900">{{ myStock.storeName }}</p>
+          <p v-if="myStock.quantity === 0" class="text-sm font-medium text-amber-700">
+            No te queda ningún par de esta talla
+          </p>
+        </div>
+        <div class="text-right">
+          <p
+            class="font-display text-4xl font-bold"
+            :class="myStock.quantity > 0 ? 'text-emerald-700' : 'text-amber-600'"
+          >
+            {{ myStock.quantity }}
+          </p>
+          <p class="text-xs text-slate-500">{{ myStock.quantity === 1 ? 'par' : 'pares' }}</p>
+        </div>
+      </div>
 
-      <ul v-else class="space-y-3">
-        <li
-          v-for="store in stores"
-          :key="store.storeNumber"
-          class="flex items-center justify-between rounded-xl px-4 py-4 shadow-sm"
-          :class="isCurrentStore(store) ? 'bg-navy-100 ring-2 ring-navy-500' : 'bg-white'"
+      <!-- Otras tiendas: solo bajo demanda -->
+      <button
+        v-if="otherStores === null"
+        type="button"
+        :disabled="loadingOthers"
+        class="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-navy-500 bg-white px-4 py-3 font-display font-semibold text-navy-700 transition hover:bg-navy-50 active:scale-[0.98] disabled:opacity-60"
+        @click="showOtherStores"
+      >
+        <svg
+          class="size-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
         >
-          <div>
-            <p class="flex items-center gap-2 font-semibold text-navy-900">
-              {{ store.storeName }}
-              <span
-                v-if="isCurrentStore(store)"
-                class="rounded-full bg-navy-600 px-2 py-0.5 text-xs font-semibold text-white"
-              >
-                Tu tienda
-              </span>
-            </p>
-            <p class="text-sm text-slate-500">Nº {{ store.storeNumber }} · {{ store.phone }}</p>
-          </div>
-          <div class="text-right">
-            <p class="font-display text-3xl font-bold text-navy-700">{{ store.quantity }}</p>
-            <p class="text-xs text-slate-500">{{ store.quantity === 1 ? 'par' : 'pares' }}</p>
-          </div>
-        </li>
-      </ul>
+          <path d="M3 9.5 12 4l9 5.5M5 10v9h14v-9M9 19v-5h6v5" />
+        </svg>
+        {{ loadingOthers ? 'Consultando…' : 'Ver stock en otras tiendas' }}
+      </button>
+
+      <template v-else>
+        <h3 class="flex items-center gap-2 pt-1 font-display text-lg font-bold text-navy-900">
+          Otras tiendas
+          <span
+            v-if="otherStores.length > 0"
+            class="rounded-full bg-navy-100 px-2 py-0.5 text-xs font-semibold text-navy-700"
+          >
+            {{ otherStores.length }}
+          </span>
+        </h3>
+
+        <p
+          v-if="otherStores.length === 0"
+          class="rounded-xl bg-white px-4 py-6 text-center text-slate-500 shadow-sm"
+        >
+          Ninguna otra tienda abierta tiene pares de esta talla.
+        </p>
+
+        <ul v-else class="space-y-3">
+          <li
+            v-for="store in otherStores"
+            :key="store.storeNumber"
+            class="flex items-center justify-between rounded-xl bg-white px-4 py-4 shadow-sm"
+          >
+            <div>
+              <p class="font-semibold text-navy-900">{{ store.storeName }}</p>
+              <p class="text-sm text-slate-500">Nº {{ store.storeNumber }} · {{ store.phone }}</p>
+            </div>
+            <div class="text-right">
+              <p class="font-display text-3xl font-bold text-navy-700">{{ store.quantity }}</p>
+              <p class="text-xs text-slate-500">{{ store.quantity === 1 ? 'par' : 'pares' }}</p>
+            </div>
+          </li>
+        </ul>
+      </template>
     </template>
   </section>
 </template>

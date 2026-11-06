@@ -9,7 +9,7 @@ describe('BottomNav', () => {
     const wrapper = mount(BottomNav, { global: { plugins: [router] } })
 
     const links = wrapper.findAll('a')
-    expect(links.map((link) => link.text())).toEqual(['Consultar', 'Vender'])
+    expect(links.map((link) => link.text())).toEqual(['Consultar', 'Vender', 'Entradas'])
     expect(links[1]?.classes()).toContain('text-navy-600')
     expect(links[0]?.classes()).not.toContain('text-navy-600')
   })

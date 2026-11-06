@@ -28,6 +28,21 @@ public class StockService {
                 .toList();
     }
 
+    /**
+     * Pares de una talla en una tienda concreta. Si la tienda nunca ha tenido esa talla, devuelve 0.
+     */
+    @Transactional(readOnly = true)
+    public StoreStockResponse findInStore(String barcode, String storeNumber) {
+        Store store = storeRepository.findByStoreNumber(storeNumber)
+                .orElseThrow(() -> new NotFoundException("No existe la tienda " + storeNumber));
+
+        int quantity = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, storeNumber)
+                .map(Stock::getQuantity)
+                .orElse(0);
+
+        return StoreStockResponse.of(store, quantity);
+    }
+
     @Transactional
     public void sell(String barcode, String storeNumber, int units) {
         Stock stock = stockRepository.findByVariantBarcodeAndStoreStoreNumber(barcode, storeNumber)
@@ -55,6 +70,30 @@ public class StockService {
         stock.add(units);
 
         stockMovementRepository.save(new StockMovement(stock, MovementType.ENTRY, units, null));
+    }
+
+    /**
+     * Registra todas las zapatillas de un albarán en una sola transacción:
+     * si una línea falla (un código que no existe, por ejemplo), no entra nada del envío.
+     */
+    @Transactional
+    public void receiveDelivery(String deliveryNote, String storeNumber, List<DeliveryRequest.Line> lines) {
+        if (stockMovementRepository.existsByDeliveryNote(deliveryNote)) {
+            throw new BusinessRuleException("El albarán " + deliveryNote + " ya ha sido registrado");
+        }
+
+        for (DeliveryRequest.Line line : lines) {
+            Stock stock = stockRepository.findByVariantBarcodeAndStoreStoreNumber(line.barcode(), storeNumber)
+                    .orElseGet(() -> createStock(line.barcode(), storeNumber));
+
+            if (!stock.getStore().isActive()) {
+                throw new BusinessRuleException("La tienda " + storeNumber + " está cerrada");
+            }
+
+            stock.add(line.units());
+
+            stockMovementRepository.save(StockMovement.deliveryEntry(stock, line.units(), deliveryNote));
+        }
     }
 
     @Transactional

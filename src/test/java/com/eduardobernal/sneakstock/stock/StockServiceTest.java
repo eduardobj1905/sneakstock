@@ -4,6 +4,7 @@ import com.eduardobernal.sneakstock.catalog.Product;
 import com.eduardobernal.sneakstock.catalog.ProductVariant;
 import com.eduardobernal.sneakstock.catalog.ProductVariantRepository;
 import com.eduardobernal.sneakstock.common.BusinessRuleException;
+import com.eduardobernal.sneakstock.common.NotFoundException;
 import com.eduardobernal.sneakstock.store.Store;
 import com.eduardobernal.sneakstock.store.StoreRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,12 +17,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -338,5 +342,89 @@ class StockServiceTest {
                 .hasMessageContaining("entre 1 y 2");
 
         verify(stockMovementRepository, never()).save(any());
+    }
+
+    // --- Recepción de albarán ---
+
+    @Test
+    @DisplayName("Registra todas las líneas de un albarán y guarda su número en cada movimiento")
+    void receiveDelivery() {
+        // Arrange: Gran Vía tiene 2 pares del Dunk US 10 y 0 del Dunk US 9
+        Stock us9Stock = new Stock(dunkUs9, granVia);
+        Stock us10Stock = new Stock(dunkUs10, granVia);
+        us10Stock.add(2);
+
+        when(stockMovementRepository.existsByDeliveryNote("ALB-0045")).thenReturn(false);
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0001"))
+                .thenReturn(Optional.of(us9Stock));
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000028", "0001"))
+                .thenReturn(Optional.of(us10Stock));
+
+        // Act: llegan 3 del US 9 y 4 del US 10
+        stockService.receiveDelivery("ALB-0045", "0001", List.of(
+                new DeliveryRequest.Line("8400000000011", 3),
+                new DeliveryRequest.Line("8400000000028", 4)));
+
+        // Assert: se suman los pares y cada movimiento lleva el número de albarán
+        assertThat(us9Stock.getQuantity()).isEqualTo(3);
+        assertThat(us10Stock.getQuantity()).isEqualTo(6);
+
+        ArgumentCaptor<StockMovement> captor = ArgumentCaptor.forClass(StockMovement.class);
+        verify(stockMovementRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(StockMovement::getType, StockMovement::getDeliveryNote)
+                .containsOnly(tuple(MovementType.ENTRY, "ALB-0045"));
+    }
+
+    @Test
+    @DisplayName("No registra dos veces el mismo albarán")
+    void receiveDeliveryTwice() {
+        when(stockMovementRepository.existsByDeliveryNote("ALB-0045")).thenReturn(true);
+
+        assertThatThrownBy(() -> stockService.receiveDelivery("ALB-0045", "0001",
+                List.of(new DeliveryRequest.Line("8400000000011", 1))))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("ya ha sido registrado");
+
+        verifyNoInteractions(stockRepository);
+        verify(stockMovementRepository, never()).save(any());
+    }
+
+    // --- Consulta del stock en una tienda ---
+
+    @Test
+    @DisplayName("Devuelve los pares de una talla en una tienda")
+    void findInStore() {
+        Stock stock = new Stock(dunkUs9, granVia);
+        stock.add(3);
+        when(storeRepository.findByStoreNumber("0001")).thenReturn(Optional.of(granVia));
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000011", "0001"))
+                .thenReturn(Optional.of(stock));
+
+        StoreStockResponse response = stockService.findInStore("8400000000011", "0001");
+
+        assertThat(response.storeName()).isEqualTo("Gran Vía");
+        assertThat(response.quantity()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("Si la tienda nunca ha tenido esa talla, devuelve 0 pares en lugar de un error")
+    void findInStoreWithoutStock() {
+        when(storeRepository.findByStoreNumber("0001")).thenReturn(Optional.of(granVia));
+        when(stockRepository.findByVariantBarcodeAndStoreStoreNumber("8400000000035", "0001"))
+                .thenReturn(Optional.empty());
+
+        StoreStockResponse response = stockService.findInStore("8400000000035", "0001");
+
+        assertThat(response.quantity()).isZero();
+    }
+
+    @Test
+    @DisplayName("Una tienda que no existe lanza NotFoundException")
+    void findInUnknownStore() {
+        when(storeRepository.findByStoreNumber("9999")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> stockService.findInStore("8400000000011", "9999"))
+                .isInstanceOf(NotFoundException.class);
     }
 }
