@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BottomNav from '@/components/BottomNav.vue'
 import { currentStore } from '@/currentStore'
 </script>
 
@@ -14,8 +15,11 @@ import { currentStore } from '@/currentStore'
       <p class="text-sm text-navy-200">Nº de tienda: {{ currentStore.number }}</p>
     </header>
 
-    <main class="mx-auto max-w-xl p-4">
+    <!-- pb-24: deja hueco al final para que la barra de abajo no tape el contenido -->
+    <main class="mx-auto max-w-xl p-4 pb-24">
       <RouterView />
     </main>
+
+    <BottomNav />
   </div>
 </template>
