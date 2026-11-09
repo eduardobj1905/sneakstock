@@ -3,7 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import TransferReceive from '../TransferReceive.vue'
 import { findTransfer, receiveTransfer, type Transfer } from '@/api/stock'
 
-vi.mock('@/api/stock', () => ({ findTransfer: vi.fn(), receiveTransfer: vi.fn() }))
+vi.mock('@/api/stock')
 
 const fromSol: Transfer = {
   transferId: 12,

@@ -4,10 +4,10 @@ import SaleView from '../SaleView.vue'
 import { sell } from '@/api/stock'
 import { findVariant, type Variant } from '@/api/catalog'
 
-vi.mock('@/api/stock', () => ({ sell: vi.fn() }))
+vi.mock('@/api/stock')
 vi.mock('@/api/catalog', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/catalog')>()),
-  findVariant: vi.fn(),
+  findVariant: vi.fn<typeof import('@/api/catalog').findVariant>(),
 }))
 
 const dunkUs9: Variant = {

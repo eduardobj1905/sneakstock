@@ -5,11 +5,11 @@ import { sendTransfer } from '@/api/stock'
 import { findVariant, type Variant } from '@/api/catalog'
 import { findOpenStores } from '@/api/stores'
 
-vi.mock('@/api/stock', () => ({ sendTransfer: vi.fn() }))
-vi.mock('@/api/stores', () => ({ findOpenStores: vi.fn() }))
+vi.mock('@/api/stock')
+vi.mock('@/api/stores')
 vi.mock('@/api/catalog', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/catalog')>()),
-  findVariant: vi.fn(),
+  findVariant: vi.fn<typeof import('@/api/catalog').findVariant>(),
 }))
 
 const dunkUs9: Variant = {

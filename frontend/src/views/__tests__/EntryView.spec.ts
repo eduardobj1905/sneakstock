@@ -4,8 +4,8 @@ import EntryView from '../EntryView.vue'
 import { receiveDelivery } from '@/api/stock'
 import { findVariant, type Variant } from '@/api/catalog'
 
-vi.mock('@/api/stock', () => ({ receiveDelivery: vi.fn() }))
-vi.mock('@/api/catalog', () => ({ findVariant: vi.fn() }))
+vi.mock('@/api/stock')
+vi.mock('@/api/catalog')
 
 const dunkUs9: Variant = {
   barcode: '8400000000011',

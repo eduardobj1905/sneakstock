@@ -5,8 +5,8 @@ import { findAvailableStock, findStockInStore } from '@/api/stock'
 import { findVariant, type Variant } from '@/api/catalog'
 
 // Sustituimos las llamadas al backend por mocks, igual que con Mockito en Java
-vi.mock('@/api/stock', () => ({ findAvailableStock: vi.fn(), findStockInStore: vi.fn() }))
-vi.mock('@/api/catalog', () => ({ findVariant: vi.fn() }))
+vi.mock('@/api/stock')
+vi.mock('@/api/catalog')
 
 const dunkUs9: Variant = {
   barcode: '8400000000011',
