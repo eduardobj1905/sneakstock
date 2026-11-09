@@ -16,5 +16,21 @@ services:
       timeout: 3s
       retries: 20
 
+  # La app completa (frontend + API) en un contenedor. Solo arranca con el perfil "app":
+  #   docker compose --profile app up --build
+  # Sin el perfil, este archivo sigue levantando únicamente MySQL para desarrollar.
+  app:
+    profiles: ["app"]
+    build: .
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/sneakstock
+      DB_USERNAME: ${DB_USERNAME:-sneakstock}
+      DB_PASSWORD: ${DB_PASSWORD:-sneakstock}
+    ports:
+      - "8081:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   mysql-data:
