@@ -26,5 +26,7 @@ WORKDIR /app
 RUN useradd --system --no-create-home sneakstock
 COPY --from=backend /app/target/*.jar app.jar
 USER sneakstock
+# La JVM se ajusta a la memoria del contenedor (los planes gratuitos suelen dar 512 MB)
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+UseSerialGC"
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

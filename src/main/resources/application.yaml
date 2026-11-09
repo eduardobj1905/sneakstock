@@ -9,3 +9,7 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+
+server:
+  # Las plataformas de despliegue indican el puerto con la variable PORT; en local, 8080
+  port: ${PORT:8080}
