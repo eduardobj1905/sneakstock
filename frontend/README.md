@@ -19,8 +19,9 @@ npm run build        # compilación para producción
 ```
 src/
 ├── api/          llamadas al backend (stock, catálogo) y lectura de errores ProblemDetail
-├── components/   piezas reutilizables: barra de navegación, tarjeta de la zapatilla
-├── views/        pantallas: consultar, vender, entradas
+├── components/   piezas reutilizables: barra de navegación, tarjeta de la zapatilla,
+│                 selector de unidades y las dos partes de traspasos
+├── views/        pantallas: consultar, vender, entradas, traspasos
 ├── router/       rutas de la aplicación
 └── currentStore.ts   tienda en la que trabaja el dependiente (hasta que haya login)
 ```

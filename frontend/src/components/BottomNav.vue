@@ -20,6 +20,11 @@ const items = [
     label: 'Entradas',
     icon: 'M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9Zm0 0 9 4.5 9-4.5M12 12v9',
   },
+  {
+    to: '/traspasos',
+    label: 'Traspasos',
+    icon: 'M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
+  },
 ]
 </script>
 

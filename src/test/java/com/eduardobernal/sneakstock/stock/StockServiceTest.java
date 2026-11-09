@@ -194,6 +194,8 @@ class StockServiceTest {
                 .thenReturn(Optional.of(solStock));
         when(storeRepository.findByStoreNumber("0001"))
                 .thenReturn(Optional.of(granVia));
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act: Sol envía 1 par a Gran Vía
         stockService.sendTransfer("8400000000011", "0002", "0001", 1);
@@ -426,5 +428,35 @@ class StockServiceTest {
 
         assertThatThrownBy(() -> stockService.findInStore("8400000000011", "9999"))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    // --- Consulta de un traspaso ---
+
+    @Test
+    @DisplayName("Devuelve un traspaso con su origen, destino, zapatilla y pares enviados")
+    void findTransfer() {
+        StockMovement transferOut = StockMovement.transferOut(new Stock(dunkUs9, sol), 2, granVia);
+        when(stockMovementRepository.findById(3L)).thenReturn(Optional.of(transferOut));
+        when(stockMovementRepository.existsByTransferOutId(3L)).thenReturn(false);
+
+        TransferResponse response = stockService.findTransfer(3L);
+
+        assertThat(response.originStoreName()).isEqualTo("Sol");
+        assertThat(response.destinationStoreNumber()).isEqualTo("0001");
+        assertThat(response.variant().model()).isEqualTo("Dunk Low");
+        assertThat(response.sentUnits()).isEqualTo(2);
+        assertThat(response.received()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Un movimiento que no es un envío de traspaso se trata como si no existiera")
+    void findTransferThatIsASale() {
+        Stock stock = new Stock(dunkUs9, sol);
+        StockMovement sale = new StockMovement(stock, MovementType.SALE, -1, null);
+        when(stockMovementRepository.findById(5L)).thenReturn(Optional.of(sale));
+
+        assertThatThrownBy(() -> stockService.findTransfer(5L))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("No existe el traspaso 5");
     }
 }

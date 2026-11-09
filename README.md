@@ -21,7 +21,7 @@ El dependiente escanea una caja y ve al instante qué zapatilla es, cuántos par
 | **Consultar** | Escaneas una caja y ves la zapatilla y los pares que hay en tu tienda. Las demás tiendas se consultan solo bajo demanda, con un botón. |
 | **Vender** | Escaneas, compruebas que es la zapatilla correcta antes de confirmar y registras la venta. Si no hay pares suficientes, la app te lo dice con el stock exacto. |
 | **Entradas** | Escaneas el número de albarán y cada zapatilla del envío; la app agrupa las unidades por talla. Cuando la lista cuadra con el albarán, lo registras todo de una vez. |
-| **Traspasos** *(backend listo, pantalla en desarrollo)* | Una tienda envía pares a otra; mientras viajan no cuentan en ninguna. La tienda destino los recibe y, si faltan pares, queda anotado. |
+| **Traspasos** | Envías pares a otra tienda y la app te da el número de traspaso para apuntarlo en la caja. Mientras viajan no cuentan en ninguna tienda. La tienda destino escanea ese número, ve qué llega y lo recibe; si faltan pares, queda anotado. |
 
 ## Stack
 
@@ -102,8 +102,8 @@ La app trabaja como la tienda **0001 · Gran Vía**. Códigos de barras para pro
 ## Tests
 
 ```bash
-./mvnw test                 # backend: 27 tests (requiere la base de datos de Docker)
-cd frontend && npm run test:unit -- --run   # frontend: 14 tests
+./mvnw test                 # backend: 30 tests (requiere la base de datos de Docker)
+cd frontend && npm run test:unit -- --run   # frontend: 21 tests
 ```
 
 - **Unitarios** de las reglas de negocio con Mockito, sin base de datos.
@@ -115,18 +115,19 @@ cd frontend && npm run test:unit -- --run   # frontend: 14 tests
 
 | Método | Ruta | Descripción |
 |---|---|---|
+| `GET` | `/api/stores` | Tiendas abiertas de la cadena |
 | `GET` | `/api/variants/{barcode}` | Qué zapatilla y qué talla es un código de barras |
 | `GET` | `/api/stock/stores/{storeNumber}?barcode=` | Pares de una talla en una tienda |
 | `GET` | `/api/stock?barcode=` | Tiendas abiertas con pares de una talla |
 | `POST` | `/api/stock/sales` | Registrar una venta |
 | `POST` | `/api/stock/entries` | Registrar una entrada de una talla |
 | `POST` | `/api/stock/deliveries` | Registrar un albarán completo |
-| `POST` | `/api/stock/transfers` | Enviar un traspaso a otra tienda |
+| `POST` | `/api/stock/transfers` | Enviar un traspaso a otra tienda (devuelve su número) |
+| `GET` | `/api/stock/transfers/{id}` | Ver un traspaso antes de recibirlo |
 | `POST` | `/api/stock/transfers/{id}/receptions` | Recibir un traspaso |
 
 ## Próximos pasos
 
-- [ ] Pantalla de traspasos (enviar y recibir)
 - [ ] Integración continua con GitHub Actions
 - [ ] Documentación interactiva de la API con Swagger / OpenAPI
 - [ ] Tests de integración con Testcontainers
