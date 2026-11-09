@@ -1,5 +1,7 @@
 # SneakStock
 
+[![CI](https://github.com/eduardobj1905/sneakstock/actions/workflows/ci.yml/badge.svg)](https://github.com/eduardobj1905/sneakstock/actions/workflows/ci.yml)
+
 **Gestión de stock para una cadena de tiendas de zapatillas, pensada para usarse desde el móvil como una PDA de tienda.**
 
 El dependiente escanea una caja y ve al instante qué zapatilla es, cuántos pares quedan en su tienda y, si el cliente lo pide, en qué otras tiendas hay. Desde la misma app registra ventas, recibe albaranes de mercancía y hace traspasos entre tiendas, sin que el stock pueda quedar en negativo ni descuadrarse.
@@ -30,7 +32,8 @@ El dependiente escanea una caja y ve al instante qué zapatilla es, cuántos par
 | **Backend** | Java 21, Spring Boot 4, Spring Data JPA (Hibernate), Bean Validation |
 | **Base de datos** | MySQL 8.4 en Docker, migraciones con Flyway |
 | **Frontend** | Vue 3 + TypeScript, Vue Router, Tailwind CSS 4, Vite |
-| **Tests** | JUnit 5, Mockito, MockMvc (`@WebMvcTest`), Vitest + Vue Test Utils |
+| **Tests** | JUnit 5, Mockito, MockMvc (`@WebMvcTest`), Testcontainers, Vitest + Vue Test Utils |
+| **Calidad y despliegue** | GitHub Actions, Swagger / OpenAPI (springdoc), Docker (imagen única con frontend y API) |
 
 ## Arquitectura
 
@@ -59,6 +62,8 @@ El backend está organizado **por funcionalidad** (`catalog`, `store`, `stock`, 
 - **Errores con su código HTTP correcto** en formato estándar `ProblemDetail` (RFC 9457): 404 si algo no existe, 409 si se incumple una regla de negocio, 400 si la petición no es válida, con el mensaje de cada campo.
 - **Prevenir antes que corregir.** Antes de confirmar una venta o una entrada, la app enseña qué zapatilla corresponde al código escaneado, para detectar etiquetas o escaneos equivocados.
 - **Migraciones versionadas** con Flyway: el esquema solo cambia con migraciones nuevas; las aplicadas no se editan.
+- **Tests de integración aislados** con Testcontainers: cada ejecución arranca su propio MySQL de usar y tirar, igual en local que en GitHub Actions.
+- **Una sola imagen Docker** para desplegar: el frontend compilado se sirve desde Spring Boot, sin proxy ni CORS en producción.
 
 ## Cómo arrancarlo
 
@@ -91,6 +96,10 @@ npm install
 npm run dev
 ```
 
+La documentación interactiva de la API está en `http://localhost:8080/swagger-ui.html`.
+
+**Todo con Docker**, sin instalar Java ni Node: `docker compose --profile app up --build` y la app queda en `http://localhost:8081`.
+
 La app trabaja como la tienda **0001 · Gran Vía**. Códigos de barras para probar:
 
 | Código | Zapatilla |
@@ -102,16 +111,19 @@ La app trabaja como la tienda **0001 · Gran Vía**. Códigos de barras para pro
 ## Tests
 
 ```bash
-./mvnw test                 # backend: 30 tests (requiere la base de datos de Docker)
+./mvnw test                 # backend: 30 tests (requiere Docker para Testcontainers)
 cd frontend && npm run test:unit -- --run   # frontend: 21 tests
 ```
 
 - **Unitarios** de las reglas de negocio con Mockito, sin base de datos.
 - **Capa web** con `@WebMvcTest`: cada error llega con su código HTTP y su mensaje.
-- **Integración** de la consulta de stock contra MySQL.
+- **Integración** contra un MySQL real arrancado con Testcontainers.
+- **GitHub Actions** ejecuta en cada pull request los tests, los linters, la comprobación de tipos y el build.
 - **Frontend** con Vitest, simulando el backend.
 
 ## API
+
+Documentación completa e interactiva en `/swagger-ui.html`.
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -128,10 +140,7 @@ cd frontend && npm run test:unit -- --run   # frontend: 21 tests
 
 ## Próximos pasos
 
-- [ ] Integración continua con GitHub Actions
-- [ ] Documentación interactiva de la API con Swagger / OpenAPI
-- [ ] Tests de integración con Testcontainers
-- [ ] Despliegue con enlace público
+- [ ] Despliegue con enlace público (preparado: [guía de despliegue](docs/despliegue.md))
 - [ ] Login y roles (dependiente, encargado, central) con Spring Security y JWT
 
 ## Autor
