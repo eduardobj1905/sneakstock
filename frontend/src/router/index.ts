@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import StockLookupView from '@/views/StockLookupView.vue'
 import SaleView from '@/views/SaleView.vue'
 import EntryView from '@/views/EntryView.vue'
+import TransferView from '@/views/TransferView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -20,6 +21,11 @@ const router = createRouter({
       path: '/entradas',
       name: 'entry',
       component: EntryView,
+    },
+    {
+      path: '/traspasos',
+      name: 'transfers',
+      component: TransferView,
     },
   ],
 })
