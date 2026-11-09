@@ -52,9 +52,15 @@ public class StockController {
 
     @PostMapping("/transfers")
     @ResponseStatus(HttpStatus.CREATED)
-    public void sendTransfer(@Valid @RequestBody TransferRequest request) {
-        stockService.sendTransfer(request.barcode(), request.originStoreNumber(),
+    public TransferCreatedResponse sendTransfer(@Valid @RequestBody TransferRequest request) {
+        Long transferId = stockService.sendTransfer(request.barcode(), request.originStoreNumber(),
                 request.destinationStoreNumber(), request.units());
+        return new TransferCreatedResponse(transferId);
+    }
+
+    @GetMapping("/transfers/{transferId}")
+    public TransferResponse findTransfer(@PathVariable Long transferId) {
+        return stockService.findTransfer(transferId);
     }
 
     @PostMapping("/transfers/{transferId}/receptions")

@@ -97,7 +97,7 @@ public class StockService {
     }
 
     @Transactional
-    public void sendTransfer(String barcode, String originStoreNumber, String destinationStoreNumber, int units) {
+    public Long sendTransfer(String barcode, String originStoreNumber, String destinationStoreNumber, int units) {
         if (originStoreNumber.equals(destinationStoreNumber)) {
             throw new IllegalArgumentException("La tienda de origen y la de destino no pueden ser la misma");
         }
@@ -119,7 +119,20 @@ public class StockService {
 
         origin.remove(units);
 
-        stockMovementRepository.save(StockMovement.transferOut(origin, units, destination));
+        // El id del envío es el número de traspaso que se apunta en la caja
+        return stockMovementRepository.save(StockMovement.transferOut(origin, units, destination)).getId();
+    }
+
+    /**
+     * Un traspaso por su número, para ver qué es y de dónde viene antes de recibirlo.
+     */
+    @Transactional(readOnly = true)
+    public TransferResponse findTransfer(Long transferId) {
+        StockMovement transferOut = stockMovementRepository.findById(transferId)
+                .filter(movement -> movement.getType() == MovementType.TRANSFER_OUT)
+                .orElseThrow(() -> new NotFoundException("No existe el traspaso " + transferId));
+
+        return TransferResponse.from(transferOut, stockMovementRepository.existsByTransferOutId(transferId));
     }
 
     @Transactional
